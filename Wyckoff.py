@@ -155,7 +155,7 @@ def semi_readCIF(nombre):
         for i in Lines:
             
             if "_symmetry_Int_Tables_number" in i:
-                g=int(i.replace("_symmetry_Int_Tables_number"," "))
+                g=int(i.replace("_symmetry_Int_Tables_number"," ").strip())
                 print("El archivo fue leído, pero corresponde a un estándar cif antiguo o tiene opciones de retrocompatibilidad. Esto puede afectar ligeramente el funcionamiento")
     
                 
@@ -227,8 +227,7 @@ def semi_readCIF(nombre):
                             elementos[Standard_ion(lista[prov1[0]])][1],
                             float(lista[prov1[4]])
                                      ])
-        print(grupo)
         #print(custom_group(grupo, celda[0]))
-        return([g,constantes,celda,grupo])
+        return([g,np.array(constantes),np.array(celda),grupo])
     except:
-        print("Error al leer el archivo")
+        raise ValueError ("Error al leer el archivo")
