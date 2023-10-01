@@ -7,6 +7,7 @@ Created on Thu Feb 23 18:34:05 2023
 import numpy as np
 import tablas
 
+delta=0.00001
 a=223
 celda= np.array([
     [22,0.1,0.2,0.3,0],
@@ -16,7 +17,8 @@ celda= np.array([
 #IMPORTANTE: LA SALIDA ES DE 3 VALORES, NO DE 6. 
 
 
-n=4
+n=-int(np.log10(delta))
+
 def standard(arr):
     for i in [0,1,2]:
         while np.abs(arr[i])>=1 or arr[i]<0:
@@ -60,7 +62,6 @@ def custom_group(grupo,entrada):
         g2.append(prov)
         prov=[]
     flag=False
-    delta=0.0001
     for i in g2:
         for j in res:
             if np.linalg.norm(np.array(standard(i))-np.array(j))<delta:
