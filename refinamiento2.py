@@ -67,6 +67,8 @@ arr=np.loadtxt(filename,skiprows=27,delimiter=",")
 
 data=np.genfromtxt("HF2.csv",delimiter=",")
 ba2sm=np.genfromtxt("Ba2SbSmO6.ASC",delimiter=" ")
+#ba2sm=np.genfromtxt("Ba2.txt",delimiter=" ")
+
 #------------------------------------------------------------------------------------------------------------
 #Regresión polinómica para el fondo.
 class datos():
@@ -584,112 +586,248 @@ class estructura():
         return res
 Ti=estructura(ks1, cel1, 194)
 
-prov=Wyckoff.semi_readCIF("Ba2SbSmO6.cif")
 
+
+def iteration(structs, datasource,flag=False):
+    #Unir las estructuras equivalentes (ka con su respectivo kb) para que la derivada afecte a todo el pico y no solo una parte
+     data_ints = datasource.ints-datasource.bgints
+     weights= 1/datasource.ints
+     
+     derivadasC=[]
+     derivadasU=[]
+     derivadasA=[]
+     for j in structs:
+         for i in np.where(j.refinableks)[0]:
+             derivadasC.append(j.deriv(i,"C",datasource.angs)*weights)
+         for i in np.where(j.refinableUVWg)[0]:
+            derivadasU.append(j.deriv(i,"U",datasource.angs)*weights)
+         for i in np.where(j.refinableCel.flatten())[0]:
+             derivadasA.append(j.deriv(i,"A",datasource.angs)*weights)
+     derivadas = derivadasC+derivadasU+derivadasA
+
+     #Se dividen todas las derivadas entre la intensidad. Para restaurar que el peso es 1/I en lugar de
+     #1/I^2, se multiplica por I al armar la matriz
+     matriz = np.ones((len(derivadas),len(derivadas)))
+     
+     for i in range (0,len(derivadas)):
+         for j in range(0,len(derivadas)):
+             matriz[i,j]= np.sum(derivadas[i]*derivadas[j]/weights)
+     delta = (Intensidad(structs,datasource.angs) - data_ints)
+     deltavec=np.ones((len(derivadas),1))
+     #print(matriz)
+     for i in range(0,len(derivadas)):
+         deltavec[i,0]= np.sum(delta * derivadas[i])
+     #print(deltavec)
+     print(matriz)
+     if flag:
+         fig,ax=plt.subplots()
+         ax.plot(datasource.angs,delta/datasource.ints)
+         plt.show()
+     res =  solve(matriz,deltavec)
+     print(res)
+     return res
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+prov=Wyckoff.semi_readCIF("Ba2SbSmO6.cif")
+prov2=Wyckoff.semi_readCIF("Ba2SbSmO6.cif")
 print (prov[1])
 Ba2SbSmO6= estructura(prov[1],prov[2],prov[0],prov[3])
+Copia= estructura(prov2[1],prov2[2],prov2[0],prov2[3])
 #Ba2SbSmO6.refinableks[0]=False
-Ba2SbSmO6.ks[0]=1.02e-4
+Ba2SbSmO6.ks[0]=2.04e-4
+Copia.ks[0]=4.08e-4
+Copia.refinableCel=np.array([[0,0,0,0,0,0],
+                           [0,0,0,0,0,0],
+                           [0,0,0,0,0,0],
+                           [0,0,0,0,0,0]],dtype=bool)
+
+Copia.refinableks = np.array([1,0,0,0,0,0,0])
+
 
 r=[]
 As=[]
 Xs=[]
 k=[]
+k2=[]
 u=[]
 Ba2SbSmO6.refinableCel=np.array([[0,0,0,0,0,0],
-                           [0,0,0,0,0,0],
-                           [0,0,0,0,0,0],
-                           [0,1,0,0,0,0]],dtype=bool)
+                            [0,0,0,0,0,0],
+                            [0,0,0,0,0,0],
+                            [0,1,0,0,0,0]],dtype=bool)
 Ba2SbSmO6.refinableks = np.array([1,1,0,0,0,0,0])
 suma = np.sum(ASCBa.ints)
-Ba2SbSmO6.ks[[1,2,3]]=8.493
+Ba2SbSmO6.ks[[1,2,3]]=8.510
+Copia.ks[[1,2,3]]=8.510
 #Ba2SbSmO6.ks[[1,2,3]]=8.503
 Ba2SbSmO6.celda[3,1]=0.211
+Copia.celda[3,1]=0.211
 
 Ba2SbSmO6.UVWg[2]=0.01
+Copia.UVWg[2]=0.01
+
 #Ba2SbSmO6.celda[3,1]=0.235
+Ba2SbSmO6.refinableUVWg=np.array([0,0,1,0])
+Copia.refinableUVWg=np.array([0,0,0,0])
+Copia.la=la2
 
-#Algo extraño está pasando cuando f1 no es 0 o 1. Revisar en dónde aparece el error
-f1=1
-ax.scatter(ASCBa.angs, Intensidad([Ba2SbSmO6],ASCBa.angs),label="Inicial",s=4,color="black")
-r.append(np.sum(((np.abs(ASCBa.ints - ASCBa.bgints - Intensidad([Ba2SbSmO6],ASCBa.angs)))/suma)))
-As.append(Ba2SbSmO6.ks[1])
-Xs.append(Ba2SbSmO6.celda[3,1])
-k.append(Ba2SbSmO6.ks[0])
-u.append(Ba2SbSmO6.UVWg[2])
 
-Ba2SbSmO6.FullCell = Wyckoff.custom_Wyckoff(Ba2SbSmO6.grupo, Ba2SbSmO6.celda)
+iteration([Ba2SbSmO6,Copia],ASCBa)
+iteration([Ba2SbSmO6,Copia],ASCBa)
+Ba2SbSmO6.iteration(ASCBa)
 
-NumIters=30
-Ba2SbSmO6.iteration(ASCBa,True)
+NumIters=25
+
+ax.scatter(ASCBa.angs, Intensidad([Ba2SbSmO6,Copia],ASCBa.angs),label="Inicial",s=4,color="black")
+
 
 Ba2SbSmO6.refinableCel=np.array([[0,0,0,0,0,0],
                            [0,0,0,0,0,0],
+                            [0,0,0,0,0,0],
+                            [0,0,0,0,0,0]],dtype=bool)
+Ba2SbSmO6.refinableks = np.array([1,1,0,0,0,0,0])
+Ba2SbSmO6.refinableUVWg=np.array([0,0,1,0])
+Copia.refinableks[0] = 1
+
+
+for i in range(0,NumIters):
+      print(i)
+      vector = iteration([Ba2SbSmO6,Copia],ASCBa)
+      Ba2SbSmO6.ks[0] -= vector[0,0]
+      Ba2SbSmO6.ks[[1,2,3]] -= vector[1,0]
+      Copia.ks[[1,2,3]] -= vector[1,0]
+      Copia.ks[0] -= vector[2,0]
+      Ba2SbSmO6.UVWg[2] = np.abs(Ba2SbSmO6.UVWg[2] - vector[3,0])
+      Copia.UVWg[2] = np.abs(Ba2SbSmO6.UVWg[2] - vector[3,0])
+#      Ba2SbSmO6.moveatom(19,-vector[4,0])
+#      Copia.moveatom(19,-vector[4,0])
+#      Ba2SbSmO6.FullCell = Wyckoff.custom_Wyckoff(Ba2SbSmO6.grupo, Ba2SbSmO6.celda)
+#      Copia.FullCell = Wyckoff.custom_Wyckoff(Copia.grupo, Copia.celda)
+      
+      r.append(np.sum(((np.abs(ASCBa.ints - ASCBa.bgints - Intensidad([Ba2SbSmO6,Copia],ASCBa.angs)))/suma)))
+      As.append(Ba2SbSmO6.ks[1])
+      Xs.append(Ba2SbSmO6.celda[3,1])
+      k.append(Ba2SbSmO6.ks[0])
+      k2.append(Copia.ks[0])
+      u.append(Ba2SbSmO6.UVWg[2])
+
+
+Ba2SbSmO6.refinableCel=np.array([[0,0,0,0,0,0],
                            [0,0,0,0,0,0],
-                           [0,0,0,0,0,0]],dtype=bool)
+                            [0,0,0,0,0,0],
+                            [0,1,0,0,0,0]],dtype=bool)
+Ba2SbSmO6.refinableks = np.array([0,1,0,0,0,0,0])
+Ba2SbSmO6.refinableUVWg=np.array([0,0,0,0])
+Copia.refinableks[0] = 0
+
+for i in range(0,NumIters):
+      print(i)
+      vector = iteration([Ba2SbSmO6,Copia],ASCBa)
+#      Ba2SbSmO6.ks[0] -= vector[0,0]
+      Ba2SbSmO6.ks[[1,2,3]] -= vector[0,0]
+      Copia.ks[[1,2,3]] -= vector[0,0]
+#      Copia.ks[0] -= vector[2,0]
+#      Ba2SbSmO6.UVWg[2] = np.abs(Ba2SbSmO6.UVWg[2] - vector[1,0])
+#      Copia.UVWg[2] = np.abs(Ba2SbSmO6.UVWg[2] - vector[1,0])
+#      Copia.ks[0] = Ba2SbSmO6.ks[0]*2
+      Ba2SbSmO6.moveatom(19,-vector[1,0])
+      Copia.moveatom(19,-vector[1,0])
+      Ba2SbSmO6.FullCell = Wyckoff.custom_Wyckoff(Ba2SbSmO6.grupo, Ba2SbSmO6.celda)
+      Copia.FullCell = Wyckoff.custom_Wyckoff(Copia.grupo, Copia.celda)
+      
+      r.append(np.sum(((np.abs(ASCBa.ints - ASCBa.bgints - Intensidad([Ba2SbSmO6,Copia],ASCBa.angs)))/suma)))
+      As.append(Ba2SbSmO6.ks[1])
+      Xs.append(Ba2SbSmO6.celda[3,1])
+      k.append(Ba2SbSmO6.ks[0])
+      k2.append(Copia.ks[0])
+      u.append(Ba2SbSmO6.UVWg[2])
+
+
+Ba2SbSmO6.refinableCel=np.array([[0,0,0,0,0,0],
+                           [0,0,0,0,0,0],
+                            [0,0,0,0,0,0],
+                            [0,0,0,0,0,0]],dtype=bool)
+Ba2SbSmO6.refinableks = np.array([1,1,0,0,0,0,0])
+Ba2SbSmO6.refinableUVWg=np.array([0,0,1,0])
+Copia.refinableks[0] = 1
+for i in range(0,NumIters):
+      print(i)
+      vector = iteration([Ba2SbSmO6,Copia],ASCBa)
+      Ba2SbSmO6.ks[0] -= vector[0,0]
+      Ba2SbSmO6.ks[[1,2,3]] -= vector[1,0]
+      Copia.ks[[1,2,3]] -= vector[1,0]
+      Copia.ks[0] -= vector[2,0]
+      Ba2SbSmO6.UVWg[2] = np.abs(Ba2SbSmO6.UVWg[2] - vector[3,0])
+      Copia.UVWg[2] = np.abs(Copia.UVWg[2] - vector[3,0])
+#      Ba2SbSmO6.moveatom(19,-vector[4,0])
+#      Copia.moveatom(19,-vector[4,0])
+#      Ba2SbSmO6.FullCell = Wyckoff.custom_Wyckoff(Ba2SbSmO6.grupo, Ba2SbSmO6.celda)
+#      Copia.FullCell = Wyckoff.custom_Wyckoff(Copia.grupo, Copia.celda)
+      
+      r.append(np.sum(((np.abs(ASCBa.ints - ASCBa.bgints - Intensidad([Ba2SbSmO6,Copia],ASCBa.angs)))/suma)))
+      As.append(Ba2SbSmO6.ks[1])
+      Xs.append(Ba2SbSmO6.celda[3,1])
+      k.append(Ba2SbSmO6.ks[0])
+      k2.append(Copia.ks[0])
+      u.append(Ba2SbSmO6.UVWg[2])
+      
+      
+Ba2SbSmO6.refinableCel=np.array([[0,0,0,0,0,0],
+                           [0,0,0,0,0,0],
+                            [0,0,0,0,0,0],
+                            [0,1,0,0,0,0]],dtype=bool)
 Ba2SbSmO6.refinableks = np.array([1,1,0,0,0,0,0])
 Ba2SbSmO6.refinableUVWg=np.array([0,0,0,0])
-for i in range(0,30):
+Copia.refinableks[0] = 0
+
+for i in range(0,NumIters):
       print(i)
-      vector = Ba2SbSmO6.iteration(ASCBa)
+      vector = iteration([Ba2SbSmO6,Copia],ASCBa)
       Ba2SbSmO6.ks[0] -= vector[0,0]
       Ba2SbSmO6.ks[[1,2,3]] -= vector[1,0]
+      Copia.ks[[1,2,3]] -= vector[1,0]
+#      Copia.ks[0] -= vector[2,0]
 #      Ba2SbSmO6.UVWg[2] = np.abs(Ba2SbSmO6.UVWg[2] - vector[1,0])
-#      Ba2SbSmO6.moveatom(19,-vector[1,0])
-      Ba2SbSmO6.FullCell = Wyckoff.custom_Wyckoff(Ba2SbSmO6.grupo, Ba2SbSmO6.celda)
-      r.append(np.sum(((np.abs(ASCBa.ints - ASCBa.bgints - Intensidad([Ba2SbSmO6],ASCBa.angs)))/suma)))
-      As.append(Ba2SbSmO6.ks[1])
-      Xs.append(Ba2SbSmO6.celda[3,1])
-      k.append(Ba2SbSmO6.ks[0])
-      u.append(Ba2SbSmO6.UVWg[2])
-
-Ba2SbSmO6.refinableCel=np.array([[0,0,0,0,0,0],
-                           [0,0,0,0,0,0],
-                           [0,0,0,0,0,0],
-                           [0,1,0,0,0,0]],dtype=bool)
-Ba2SbSmO6.refinableks = np.array([1,1,0,0,0,0,0])
-Ba2SbSmO6.refinableUVWg=np.array([0,0,1,0])
-ax.scatter(ASCBa.angs, Intensidad([Ba2SbSmO6],ASCBa.angs),label="Intermedio",s=4,color="green")
-for i in range(0,NumIters):
-      print(i)
-      vector = Ba2SbSmO6.iteration(ASCBa)
-      Ba2SbSmO6.ks[0] -= vector[0,0]
-      Ba2SbSmO6.ks[[1,2,3]] -= vector[1,0]
-      Ba2SbSmO6.UVWg[2] = np.abs(Ba2SbSmO6.UVWg[2] - vector[2,0])
-      Ba2SbSmO6.moveatom(19,-vector[3,0])
-      Ba2SbSmO6.FullCell = Wyckoff.custom_Wyckoff(Ba2SbSmO6.grupo, Ba2SbSmO6.celda)
-      r.append(np.sum(((np.abs(ASCBa.ints - ASCBa.bgints - Intensidad([Ba2SbSmO6],ASCBa.angs)))/suma)))
-      As.append(Ba2SbSmO6.ks[1])
-      Xs.append(Ba2SbSmO6.celda[3,1])
-      k.append(Ba2SbSmO6.ks[0])
-      u.append(Ba2SbSmO6.UVWg[2])
-
-Ba2SbSmO6.refinableCel=np.array([[0,0,0,0,0,0],
-                           [0,0,0,0,0,0],
-                           [0,0,0,0,0,0],
-                           [0,1,0,0,0,0]],dtype=bool)
-Ba2SbSmO6.refinableks = np.array([1,1,0,0,0,0,0])
-Ba2SbSmO6.refinableUVWg=np.array([0,0,1,0])
-ax.scatter(ASCBa.angs, Intensidad([Ba2SbSmO6],ASCBa.angs),label="Intermedio2",s=4,color="orange")
-for i in range(0,NumIters):
-      print(i)
-      vector = Ba2SbSmO6.iteration(ASCBa)
-      Ba2SbSmO6.ks[0] -= vector[0,0]
-      Ba2SbSmO6.ks[[1,2,3]] -= vector[1,0]
-      Ba2SbSmO6.UVWg[2] = np.abs(Ba2SbSmO6.UVWg[2] - vector[1,0])
+#      Copia.UVWg[2] = np.abs(Ba2SbSmO6.UVWg[2] - vector[1,0])
+#      Copia.ks[0] = Ba2SbSmO6.ks[0]*2
       Ba2SbSmO6.moveatom(19,-vector[2,0])
+      Copia.moveatom(19,-vector[2,0])
       Ba2SbSmO6.FullCell = Wyckoff.custom_Wyckoff(Ba2SbSmO6.grupo, Ba2SbSmO6.celda)
-      r.append(np.sum(((np.abs(ASCBa.ints - ASCBa.bgints -Intensidad([Ba2SbSmO6],ASCBa.angs)))/suma)))
+      Copia.FullCell = Wyckoff.custom_Wyckoff(Copia.grupo, Copia.celda)
+      
+      r.append(np.sum(((np.abs(ASCBa.ints - ASCBa.bgints - Intensidad([Ba2SbSmO6,Copia],ASCBa.angs)))/suma)))
       As.append(Ba2SbSmO6.ks[1])
       Xs.append(Ba2SbSmO6.celda[3,1])
       k.append(Ba2SbSmO6.ks[0])
+      k2.append(Copia.ks[0])
       u.append(Ba2SbSmO6.UVWg[2])
+      
+      
 
-
-
-Ba2SbSmO6.iteration(ASCBa,True)   
-  
-ax.scatter(ASCBa.angs, Intensidad([Ba2SbSmO6],ASCBa.angs),label="Final",s=4,color="red")
+ax.scatter(ASCBa.angs, Intensidad([Ba2SbSmO6,Copia],ASCBa.angs),label="Final",s=4,color="red")
 ax.legend()
 print(Ba2SbSmO6.ks)
 print(Ba2SbSmO6.celda)
@@ -706,17 +844,18 @@ ax.plot(np.arange(len(As)),np.array(As))
 #plt.title(r'$w_i = I^{-1}$')
 plt.xlabel("Iteraciones")
 plt.ylabel("a (A)")
-ax.plot(np.array([0,NumIters]),np.array([8.503,8.503]))
+ax.plot(np.array([0,3*NumIters]),np.array([8.503,8.503]))
 
 fig,ax=plt.subplots()
 ax.plot(np.arange(len(Xs)),np.array(Xs))
 #plt.title(r'$w_i = I^{-1}$')
 plt.xlabel("Iteraciones")
 plt.ylabel("x (rel. units)")
-ax.plot(np.array([0,NumIters]),np.array([0.235,0.235]))
+ax.plot(np.array([0,3*NumIters]),np.array([0.235,0.235]))
 
 fig,ax=plt.subplots()
 ax.plot(np.arange(len(k)),np.array(k))
+ax.plot(np.arange(len(k2)),np.array(k2))
 #plt.title(r'$w_i = I^{-1}$')
 plt.xlabel("Iteraciones")
 plt.ylabel("k")
@@ -728,7 +867,8 @@ plt.xlabel("Iteraciones")
 plt.ylabel("u")
 
 
-
+fig, ax=plt.subplots()
+ax.plot(ASCBa.angs, ASCBa.ints - ASCBa.bgints - Intensidad([Ba2SbSmO6,Copia], ASCBa.angs))   
         
 
 
