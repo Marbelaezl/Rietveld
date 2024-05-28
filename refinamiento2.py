@@ -14,121 +14,30 @@ import tablas
 import time
 from numpy.linalg import norm, solve
 import matplotlib.animation as animation
+
 #mpl.use('TkAgg')
 #IMPORTANTE PARA EL EJECUTABLE AAAAAAAAAAAAAAA :)
 
 
-minang=10
-maxang=90
 
+minang=10 
+maxang=150
+delta=0.000001
+lam=1.54060
+la2=1.5443
 np.set_printoptions(suppress=True)
 plt.rcParams['figure.dpi'] = 100
 plt.rcParams['savefig.dpi'] = 100
 #Condiciones iniciales
 #Longitudes en A, ángulos en radianes
 #Estructura actual: Ti hexagonal
-k=1
-a=2.9500
-b=2.9500
-c=4.6800
-al=90*np.pi/180
-be=90*np.pi/180
-ga=120*np.pi/180
-la=1.54060
-la2=1.544398
-delta=0.00001
-cel1=np.array([
-    #[22,0,0,0.25,0,1],
-    [22,1/3,2/3,0.25,0,1]
-    ])
-ks1=[k,a,b,c,al,be,ga]
-#TiO2
-ks2=[100,4.593,4.593,2.9590,90.*np.pi/180,90*np.pi/180,90*np.pi/180]
-#ks2=[100,100,50,40,90*np.pi/180,90*np.pi/180,90*np.pi/180]
 
 
+#ba2sm = np.vstack([ba2sm[np.where(ba2sm[:,0] < 55.5)],ba2sm[np.where(ba2sm[:,0] > 56.5)]])
 
-n=1
-cel=np.array([
-      [22,0,0,0,0,1],
-      [8,0.306,0.306,0,0,n],
-      ])
-cel2=Wyckoff.Wyckoff(136, cel)
-ks3=[100,3.7850 ,3.7850 ,9.520,90*np.pi/180,90*np.pi/180,90*np.pi/180]
-cel3=Wyckoff.Wyckoff(141, np.array([[22,0,0-1/4,0-3/8,0,1],[8,0,0-1/4,0.20806-3/8,0,1]]))
-testvecs=np.array([
-    [0.33898305,0,0],
-    [0,0.33898305,0],
-    [0,0,0.2177226214]
-    ])
-
-filename= "C:\\Users\migue\Downloads\HF 2.csv"
-arr=np.loadtxt(filename,skiprows=27,delimiter=",")
-
-data=np.genfromtxt("HF2.csv",delimiter=",")
-ba2sm=np.genfromtxt("Ba2SbSmO6.ASC",delimiter=" ")
 #ba2sm=np.genfromtxt("Ba2.txt",delimiter=" ")
 
 #------------------------------------------------------------------------------------------------------------
-#Regresión polinómica para el fondo.
-class datos():
-    
-    def PowBackground(self):
-        "Se espera una entrada de 2 x n; en el que la primera columna son ángulos y la segunda son intensidades. Determina el fondo"
-        #Primero, se escribe la matriz de datos
-        matriz=np.vstack((
-            self.angs**2,
-            self.angs,
-            np.ones_like(self.angs),
-            1/(self.angs),
-            1/(self.angs**2),
-            1/(self.angs**3),
-            1/(self.angs**4),
-            1/(self.angs**5),
-            1/(self.angs**6))).T
-        #Vector de intensidades observadas
-        y=np.array([self.ints]).T
-        #Fórmula de regresión polinómica: (X^T X)^-1 X^T
-        MatFin= np.linalg.inv((matriz.T @ matriz)) @ matriz.T
-        #La estimación de los coeficientes es MatFin @ Intensidades.
-        #La interpretación de los coeficientes es tal que el fondo es fondo[0] + fondo[1]/theta + fondo[2]/theta^2 + ...
-        return MatFin @ y
-    def __init__(self,entrada):
-        self.angs=entrada[:,0]
-        self.ints=entrada[:,1]
-        self.bgcoeff= self.PowBackground()
-        self.bgints = np.zeros_like(self.angs)
-        for i in range(0,len(self.bgcoeff)):
-            self.bgints = self.bgints + (self.bgcoeff[i]/(self.angs**(i-2)))
-        sd= np.std(self.ints-self.bgints)
-        
-        #Se guardan los puntos poco intensos en datos_ruido y los picos en intensos. 
-        #Al usar np.where, se dan como listas de indices, no como los puntos en sí
-        datos_ruido=np.where(self.ints-self.bgints <= sd)
-        intensos=np.where(np.abs(self.ints-self.bgints > sd))
-        
-        #Se vuelve a calcular el fondo después de eliminar los datos intensos (picos)
-        self.angs=entrada[datos_ruido,0].flatten()
-        self.ints=entrada[datos_ruido,1].flatten()
-        self.bgcoeff= self.PowBackground()
-        #Habiendo hallado los coeficientes, se restituye la información comlpeta
-        self.angs=entrada[:,0]
-        self.ints=entrada[:,1]
-        self.bgints = np.zeros_like(self.angs)
-        for i in range(0,len(self.bgcoeff)):
-            self.bgints = self.bgints + (self.bgcoeff[i]/(self.angs**(i-2)))
-
-ASCBa =datos(ba2sm)
-HF2 = datos(data)
-
-fig,ax=plt.subplots()
-
-plt.xlabel(r'$2\theta($°)')
-plt.ylabel("Intensidad (counts)")
-fig,ax=plt.subplots()
-ax.plot(ASCBa.angs,ASCBa.ints-ASCBa.bgints)
-
-
 # Funciones requeridas para el patrón:
     
 def disf(vecs,hkl):
@@ -144,7 +53,7 @@ def disf(vecs,hkl):
     except:
         return[-1]
 
-def angf(vecs,hkl,la=la):
+def angf(vecs,hkl,la):
     h=hkl[0]
     k=hkl[1]
     l=hkl[2]
@@ -158,7 +67,7 @@ def vecdisf(vecs,hkl):
     "disf vectorizada para tomar un array hkl más grande (bidimensional)"
     return (1/np.linalg.norm(hkl@vecs,axis=1))
 
-def vecangf(vecs,hkl,la=la):
+def vecangf(vecs,hkl,la):
 
     prov=la/(2*vecdisf(vecs,hkl))
     indexes=np.where(prov<1)
@@ -182,12 +91,12 @@ def fastpicoshelp(ind,flag=True):
     return res
 
 
-def vecpicosf(vecs,indmax,la=la):
+def vecpicosf(vecs,indmax,la):
     logd=6 #logaritmo de delta
     delta=10**-logd
     prov=vecangf(vecs,fastpicoshelp(indmax),la)
     prov=prov[prov[:, 0].argsort()]
-    prov = np.delete(prov, np.argwhere(np.ediff1d(prov[:,0].round(logd)) < delta/10) + 1,axis=0)
+    prov = np.delete(prov, np.argwhere(np.ediff1d(prov[:,0].round(logd)) < delta) + 1,axis=0)
     prov2=vecangf(vecs,fastpicoshelp(indmax,flag=False),la=la)
     minii=np.searchsorted(prov[:,0],minang,side='left')
     maxii=np.searchsorted(prov[:,0],maxang,side='right')
@@ -211,11 +120,13 @@ def atom_strucf(n,par,ion=0):
           Cro_Mann[ion,n,3]*np.e**(-Cro_Mann[ion,n,7]*(par**2))+
           Cro_Mann[ion,n,8])
 
-def matrizstrucf(multip,celda, la=la):
+def matrizstrucf(multip,celda, la,flag=False):
 
     m1=multip[:,1:4]
     m2=celda[:,1:4].T
     fases= m1@m2
+    if flag:
+        print (fases)
     factores=np.ones((3,len(multip),len(celda)))
     factores[0]= (factores[0] * [celda[:,0]])
     factores[1]= (factores[1] * [celda[:,4]])
@@ -223,6 +134,8 @@ def matrizstrucf(multip,celda, la=la):
     par=np.ones((len(celda),len(multip)))
     par=par * np.sin(multip[:,0]*np.pi/360)/la
     struct=(atom_strucf(factores[0].astype(int), par.T,factores[1].astype(int)))
+    if flag:
+        print(np.hstack([struct,fases]))
     res= np.exp((0+2j)*np.pi*fases)*struct
     res= res * factores[2]
     return(np.sum(res,axis=1))
@@ -239,12 +152,12 @@ def fastintensidadesf(multip,struct):
     
 def ord2f(intens):
     "Ordena los picos según el ángulo 2theta"
-    intens=np.delete(intens,np.where(intens[:,-1]<0.001),axis=0)
+    intens=np.delete(intens,np.where(intens[:,-1]<0.0001),axis=0) 
     intens=intens[np.argsort(intens[:,0])]
     return intens
 
 
-def MinInfoPat(ctes=ks1,celda=cel1,ForceIndMax=9999, ReturnMultip=False, la=la):
+def MinInfoPat(ctes,celda,ForceIndMax=9999, ReturnMultip=False, la=lam,timer=False):
     start=time.time()
     "Regresa la lista ordenada de picos e intensidades relativas, dadas las condiciones"
     #Primero, se determinan los vectores unitarios en el sistema de ejes perpendiculares con 
@@ -254,7 +167,7 @@ def MinInfoPat(ctes=ks1,celda=cel1,ForceIndMax=9999, ReturnMultip=False, la=la):
     #La fórmula de b se puede hallar usando a . b = abcos(gamma)
     bvec=np.array([ctes[2]*np.cos(ctes[6]),ctes[2]*np.sin(ctes[6]),0])
     #Para hallar el componente en x de c (cprov[0]), se usa a . c = accos(beta), y lo mismo para el componente y
-    cprov=np.array([ctes[3]*np.cos(be),ctes[3]*((np.cos(ctes[4])-((np.cos(ctes[6]))*np.cos(ctes[5])))/np.sin(ctes[6]))])
+    cprov=np.array([ctes[3]*np.cos(ctes[5]),ctes[3]*((np.cos(ctes[4])-((np.cos(ctes[6]))*np.cos(ctes[5])))/np.sin(ctes[6]))])
     #El componente z se halla usando cx y cy, y usando que la magnitud de cvec es c
     cvec=np.array([cprov[0],cprov[1],-(ctes[3]**2-cprov[0]**2-cprov[1]**2)**(1/2)])*-1
     #el orden en la celda unitaria es átomo, ion, x, y, z
@@ -268,31 +181,29 @@ def MinInfoPat(ctes=ks1,celda=cel1,ForceIndMax=9999, ReturnMultip=False, la=la):
     #Matriz de vectores recíprocos
     #El índice máximo se obtiene con la máxima reflexión del tipo x 0 0. Como Lsin/2d = ha* + kb* + lc*,
     #entonces indmax = int(max(Lsin/2a*, Lsin/2b*, Lsin/2c*))
-    Lsin= 2*np.sin(maxang/2)/(la)
+    Lsin= 2*np.sin(maxang*np.pi/360)/(la)
     indMax= np.ceil([
         min([Lsin/(sum(ac**2)**(1/2))+1,ForceIndMax]),
         min([Lsin/(sum(bc**2)**(1/2))+1,ForceIndMax]),
         min([Lsin/(sum(cc**2)**(1/2))+1,ForceIndMax])
         ])
-    print("indmax =" + str(indMax))
-
     multip=vecpicosf(Vecs, indMax,la)
     prov=np.copy(multip)
-    end1=time.time()
-    struct=matrizstrucf(multip, celda,la)
-    end2=time.time()
-    intensidades=fastintensidadesf(multip,struct)
-    end3=time.time()
-    patron=ord2f(intensidades)
+    patron=MultipPat(ctes, celda, multip)
+
+    # struct=matrizstrucf(multip, celda,la)
+    # intensidades=fastintensidadesf(multip,struct)
+    # patron=ord2f(intensidades)
     end=time.time()
-    print("Tiempo de cálculo total: " + str(end-start))
+    if timer:
+        print("Tiempo de cálculo total: " + str(end-start))
     if ReturnMultip:
         return patron, prov
     else:
         return patron
 
 
-def MultipPat(ctes,celda,multip,CheckAngs=False, la=la):
+def MultipPat(ctes,celda,multip,CheckAngs=False, la=lam,timer=False):
     start=time.time()
     "Regresa la lista ordenada de picos e intensidades relativas, dadas las condiciones"
     #Primero, se determinan los vectores unitarios en el sistema de ejes perpendiculares con 
@@ -302,7 +213,7 @@ def MultipPat(ctes,celda,multip,CheckAngs=False, la=la):
     #La fórmula de b se puede hallar usando a . b = abcos(gamma)
     bvec=np.array([ctes[2]*np.cos(ctes[6]),ctes[2]*np.sin(ctes[6]),0])
     #Para hallar el componente en x de c (cprov[0]), se usa a . c = accos(beta), y lo mismo para el componente y
-    cprov=np.array([ctes[3]*np.cos(be),ctes[3]*((np.cos(ctes[4])-((np.cos(ctes[6]))*np.cos(ctes[5])))/np.sin(ctes[6]))])
+    cprov=np.array([ctes[3]*np.cos(ctes[5]),ctes[3]*((np.cos(ctes[4])-((np.cos(ctes[6]))*np.cos(ctes[5])))/np.sin(ctes[6]))])
     #El componente z se halla usando cx y cy, y usando que la magnitud de cvec es c
     cvec=np.array([cprov[0],cprov[1],-(ctes[3]**2-cprov[0]**2-cprov[1]**2)**(1/2)])*-1
     #el orden en la celda unitaria es átomo, ion, x, y, z
@@ -316,29 +227,34 @@ def MultipPat(ctes,celda,multip,CheckAngs=False, la=la):
     #Matriz de vectores recíprocos
     #El índice máximo se obtiene con la máxima reflexión del tipo x 0 0. Como Lsin/2d = ha* + kb* + lc*,
     #entonces indmax = int(max(Lsin/2a*, Lsin/2b*, Lsin/2c*))
-    Lsin= 2*np.sin(maxang/2)/(la)
+    Lsin= 2*np.sin(maxang*np.pi/360)/(la)
     if CheckAngs:
-        multip[:,0]=vecangf(Vecs,multip[:,1:4])
+        try:
+            multip[:,0]=vecangf(Vecs,multip[:,1:4],la=la)[:,0]
+        except:
+            print("Número de picos inconsistente. Regenerando")
+            res,multip = MinInfoPat(ctes,celda,ReturnMultip=True,la=la)
+            return res
+
     prov=np.copy(multip)
-    end1=time.time()
     struct=matrizstrucf(prov, celda,la)
     intensidades=fastintensidadesf(prov,struct)
     patron=ord2f(intensidades)
     end=time.time()
+    if timer:
+        print("tiempo de cálculo total: " + start-end)
     return patron
 
  
-U=0.00
-V=0.00
-W=0.055
+
 
 def Caglioti(ang,UVWg):
-    "Fórmula de Caglioti. El ángulo de la entrada es en radianes"
-    a=np.tan(2*np.pi * ang/360)
+    "Fórmula de Caglioti. El ángulo de la entrada es en grados"
+    a=np.tan(np.pi * ang/180)
     return np.sqrt((UVWg[0]*(a**2))+(UVWg[1]*a)+UVWg[2])
 
 #IMPORTANTE: no confundir gamma (fracción de caracter lorentziano) 
-#            con ga (ángulo que forman a y b()
+#            con ga (ángulo que forman a y b)
 
 def PseVoi(pico,UVWg,ang):
     "Halla el valor de la distribución Pseudo-Voigt centrada en pico en el valor ang"
@@ -349,16 +265,80 @@ def PseVoi(pico,UVWg,ang):
     gau= (np.sqrt(4*np.log(2)/np.pi)/Caglioti(ang/2,UVWg)) * np.exp(-(dif**2)*4*np.log(2))
     return (UVWg[3]*lor) + ((1-UVWg[3])*gau)
 
-def Intensidad (structs,ang,CheckAngs=False):
+def Intensidad (structs,ang,CheckAngs=False, MaxPeaks=99999999, force=None):
     "Función que devuelve la intensidad predicha en ang=2theta"
     "fracKa es el coeficiente que multiplica a Ka, no Ka/kb. Usar fracKa = (Ka/Kb)(1+ Ka/Kb)"
     partial = np.zeros_like(ang)
-    for i in structs:
-        patron =i.patron()
-        partial = partial + (np.sum ((PseVoi(patron[:,0], i.UVWg, ang) * patron[:,4,np.newaxis]), axis=0 )/i.ks[0])
+    if CheckAngs is False:
+        CheckAngs= np.zeros(len(structs),dtype=bool)
+    elif CheckAngs is True:
+        CheckAngs=np.ones(len(structs),dtype=bool)
+    for i in range(0,len(structs)):
+        patron =structs[i].patron(CheckAngs=CheckAngs[i],MaxPeaks=MaxPeaks)
+        partial = partial + (np.sum ((PseVoi(patron[:,0], structs[i].UVWg, ang) * patron[:,4,np.newaxis]), axis=0 )/structs[i].ks[0])
     return partial
 
 group_cutoffs= np.array([2.1,15.1,74.1,142.1,167.1,194.1,230.1])
+#Regresión polinómica para el fondo.
+class datos():
+    
+    def PowBackground(self):
+        "Se espera una entrada de 2 x n; en el que la primera columna son ángulos y la segunda son intensidades. Determina el fondo"
+        #Primero, se escribe la matriz de datos
+        matriz=np.vstack((
+            self.angs**2,
+            self.angs,
+            np.ones_like(self.angs),
+            1/(self.angs),
+            1/(self.angs**2),
+            1/(self.angs**3),
+            1/(self.angs**4),
+            1/(self.angs**5),
+            1/(self.angs**6))).T
+        #Vector de intensidades observadas
+        y=np.array([self.ints]).T
+        #Fórmula de regresión polinómica: (X^T X)^-1 X^T
+        MatFin= np.linalg.inv((matriz.T @ matriz)) @ matriz.T
+        #La estimación de los coeficientes es MatFin @ Intensidades.
+        #La interpretación de los coeficientes es tal que el fondo es fondo[0] + fondo[1]/theta + fondo[2]/theta^2 + ...
+        return MatFin @ y
+    def Noise (self):
+        self.bgcoeff= self.PowBackground()
+        self.bgints = np.zeros_like(self.angs)
+        for i in range(0,len(self.bgcoeff)):
+            self.bgints = self.bgints + (self.bgcoeff[i]/(self.angs**(i-2)))
+    def __init__(self,entrada):
+        self.angs=entrada[:,0]
+        self.ints=entrada[:,1]
+        self.Noise()
+        sd= np.std(self.ints-self.bgints)
+        
+        #Se guardan los puntos poco intensos en datos_ruido y los picos en intensos. 
+        #Al usar np.where, se dan como listas de indices, no como los puntos en sí
+        datos_ruido=np.where(self.ints-self.bgints <= sd)
+        intensos=np.where(np.abs(self.ints-self.bgints > sd))
+        
+        #Se vuelve a calcular el fondo después de eliminar los datos intensos (picos)
+        self.angs=entrada[datos_ruido,0].flatten()
+        self.ints=entrada[datos_ruido,1].flatten()
+        self.Noise()
+        #Habiendo hallado los coeficientes, se restituye la información comlpeta
+        self.angs=entrada[:,0]
+        self.ints=entrada[:,1]
+        #Se recalcula la intensidad de fondo manualmente porque al llamar Noise sobre los datos parciales se cambia el tamaño de bgints
+        self.bgints = np.zeros_like(self.angs)
+        for i in range(0,len(self.bgcoeff)):
+            self.bgints = self.bgints + (self.bgcoeff[i]/(self.angs**(i-2)))
+        
+    def UpdateNoise(self,structs):
+        prov = np.copy(self.ints) 
+        self.ints -= Intensidad([structs],self.angs)
+        self.Noise()
+        self.ints=prov
+        
+
+
+
 
 class estructura():
     def check(self, action):
@@ -454,7 +434,7 @@ class estructura():
         else:
             raise ValueError("El número de grupo es inválido")
             
-    def __init__(self,ks,celda,gnum,grupo=None,UVWg=[0,0,0.05,0.7]):
+    def __init__(self,ks,celda,gnum,grupo=None,UVWg=[0,0,0.05,0.6]):
         self.ks=ks
         self.celda=celda
         self.gnum=gnum
@@ -465,13 +445,13 @@ class estructura():
             self.grupo=grupo
         self.FullCell= Wyckoff.custom_Wyckoff(self.grupo, celda)
         self.multip=None
+        self.multip2=None
         self.check("warn")
         self.refinableCel=None
         self.UVWg=UVWg
         self.refinableUVWg=np.array([0,0,1,0],dtype=bool)
-        self.la =la
-    def Setla (self, x):
-        self.la=x
+        self.la =lam
+
     def moveatom(self,varnum,cambio):
         "Mueve el átomo la cantidad correspondiente y retorna el movimiento como array de 6 componentes"
         a=np.zeros(6)
@@ -491,46 +471,99 @@ class estructura():
             self.celda[int(varnum/6),5]+=cambio;
         return a
          
-    def patron(self,ForceIndMax=9999,CheckAngs=False):
-        if self.multip is None:
-            out, self.multip = MinInfoPat(self.ks,self.FullCell,ForceIndMax=9999,ReturnMultip=True, la = self.la)
-            return out
+    def patron(self,ForceIndMax=9999,CheckAngs=False, MaxPeaks=99999999):
+        if self.la != lam: 
+            CheckAngs=True
+            if self.multip2 is None:
+                out, self.multip2 = MinInfoPat(self.ks,self.FullCell,ReturnMultip=True,la=self.la)
+            else:
+                out= MultipPat(self.ks, self.FullCell, self.multip2, CheckAngs, la = self.la)
         else:
-            return MultipPat(self.ks, self.FullCell, self.multip, CheckAngs, la = self.la)
+            if self.multip is None:
+                out, self.multip = MinInfoPat(self.ks,self.FullCell,ForceIndMax=9999,ReturnMultip=True, la = self.la)
+            else:
+                out= MultipPat(self.ks, self.FullCell, self.multip, CheckAngs, la = self.la)
+        while len(out) > MaxPeaks:
+            out = np.delete(out, out[:,4].argmin(),axis=0)
+        return out
         
-    def deriv(self, varnum, CellOrAtom, angs, constrained=True):
+    def deriv(self, varnum, CellOrAtom, angs, constrained=True, kb=None, flag=False):
         "Encuentra la derivada parcial del patrón de difracción sobre los ángulos dados respecto a cierta variable"
+        MaxPeaks=99999999
         varnum= int(varnum)
-        
+        check=False
         if CellOrAtom not in ["A","C","U"]:
             raise ValueError("Opción inválida. ingrese C para parámetro de celda o A para posición atómica")
         ProvStruct = estructura(np.copy(self.ks),np.copy(self.celda),self.gnum,self.grupo,np.copy(self.UVWg))
+        ProvStruct.la = self.la
+        ProvStruct.multip=np.copy(self.multip)
         #print(ProvStruct.ks)
         #print(ProvStruct.celda)
         if CellOrAtom=="C":
-            locdelta = 1e-10
+            check=True
+            if varnum==0:
+                prov=self.ks[0]
+                
+                self.ks[0]= (self.ks[0]**2)*-1
+                out=intkb(self,angs,kb)
+                self.ks[0]=prov
+                return out
+            else:
+                locdelta = delta
             ProvStruct.ks[varnum] = ProvStruct.ks[varnum] + locdelta
             if constrained:
                 ProvStruct.check("max")
-            res=(Intensidad([ProvStruct], angs,CheckAngs=True)-Intensidad([self], angs))/locdelta
-            ProvStruct.ks=np.copy(self.ks)
-            return res
-                
         elif CellOrAtom == "A":
-            locdelta = delta
+            locdelta = 10*delta
             if (varnum % 6 == 0) or (varnum % 6 == 4):
                 raise ValueError ("Error. No se puede derivar respecto al tipo de átomo o el ion")
             a=ProvStruct.moveatom(varnum,locdelta)
+            MaxPeaks= min(len(ProvStruct.patron()),len(self.patron()))
             if constrained and np.all(a=0):
-                print("Error: No se encontró ninguna posición cercana con la misma multiplicidad. Intente nuevamente con la opción constrained=False")
-                return np.zeros_like(angs)
-            ProvStruct.celda[int(varnum/6)] -=a
-            #Por alguna razón esta línea es necesaria. Parece que python optimiza al no borrar la variable local ProvStruc, así que hay que restar a celda.
-            #Como FullCell no se actualiza, la derivada funciona como se espera
+                raise ValueError("Error: No se encontró ninguna posición cercana con la misma multiplicidad. Intente nuevamente con la opción constrained=False")
+                res= np.zeros_like(angs)
         elif CellOrAtom == "U":
-            locdelta = 1e-10
+            locdelta = delta
             ProvStruct.UVWg[varnum] += locdelta
-        return (Intensidad([ProvStruct],angs)-Intensidad([self],angs))/locdelta
+
+        ProvStruct.ks[0] *= -1
+        res= Intensidad([ProvStruct,self], angs,CheckAngs=[True,True],MaxPeaks=MaxPeaks)
+        if kb is not None:
+            RealM=np.copy(self.multip)
+            RealLa=self.la
+            RealK=self.ks[0]
+            ProvStruct.la = kb[0]
+            self.la=kb[0]
+            ProvStruct.ks[0] = ProvStruct.ks[0]/kb[1]
+            self.ks[0] = self.ks[0]/kb[1]
+            if CellOrAtom=="A":
+                MaxPeaks= min(len(ProvStruct.patron()),len(self.patron()))
+            res +=Intensidad([self],angs,CheckAngs=True,MaxPeaks=MaxPeaks)
+            ProvStruct.multip2=self.multip2
+            #Signo + porque Provstruct.ks[0] es negativo
+            res += Intensidad([ProvStruct],angs,CheckAngs=True,MaxPeaks=MaxPeaks)
+            if flag:
+                print("debug flag")
+            self.la=RealLa
+            self.ks[0]=RealK
+            self.multip=RealM
+        res=res/locdelta
+        if flag:
+            print("Provisional:")
+            # print(ProvStruct.patron())
+            # print("self:")
+            # print(self.patron(CheckAngs=check))
+            # print(self.multip)
+            # print ("Comprobación:")
+            # mininfo, minmultip = MinInfoPat(self.ks, self.FullCell,ReturnMultip=True)
+            # print(self.FullCell-ProvStruct.FullCell)
+            # print(self.ks - ProvStruct.ks)
+            
+            # print(matrizstrucf(self.multip, self.FullCell,self.la,True) - matrizstrucf(ProvStruct.multip, ProvStruct.FullCell, self.la,True) )
+        return res
+    
+
+    
     def idref(self):
         "Identifica qué parámetros de posición atómica son refinables. No está vectorizada completamente"
         if self.refinableCel is None:
@@ -539,28 +572,29 @@ class estructura():
             for i in range(0,len(self.celda[:,0])):
                 movimientos=np.array([[0,0,0,0,0,0.]])
                 for j in range(1,4):
-                    a=self.moveatom(6*i+j,delta)
-                    self.moveatom(6*i+j,-delta)
+                    a=self.moveatom(6*i+j,0.0002)
+                    self.moveatom(6*i+j,-0.0002)
                     #movimientos=np.vstack([movimientos,np.array([a])])
                     if np.all((np.any(a != movimientos, axis=1 ))):
                         movimientos=np.vstack([movimientos,np.array([a])])
                         prov[i,j]=True
             self.refinableCel=prov
             self.refinableUVWg = np.where(self.UVWg!=0)
-    def iteration(self, datasource,flag=False):
+            
+    def iteration(self, datasource,flag=False,kb=None):
         data_ints = datasource.ints-datasource.bgints
-        weights= 1/datasource.ints
+        weights= 1
         self.idref()
         derivadasC=[]
         derivadasU=[]
         derivadasA=[]
         for i in np.where(self.refinableks)[0]:
-            derivadasC.append(self.deriv(i,"C",datasource.angs)*weights)
+            derivadasC.append(self.deriv(i,"C",datasource.angs,kb=kb)*weights)
         for i in np.where(self.refinableUVWg)[0]:
-            derivadasU.append(self.deriv(i,"U",datasource.angs)*weights)
+            derivadasU.append(self.deriv(i,"U",datasource.angs,kb=kb)*weights)
         
         for i in np.where(self.refinableCel.flatten())[0]:
-            derivadasA.append(self.deriv(i,"A",datasource.angs)*weights)
+            derivadasA.append(self.deriv(i,"A",datasource.angs,kb=kb)*weights)
         derivadas = derivadasC+derivadasU+derivadasA
         
         #Se dividen todas las derivadas entre la intensidad. Para restaurar que el peso es 1/I en lugar de
@@ -570,305 +604,83 @@ class estructura():
         for i in range (0,len(derivadas)):
             for j in range(0,len(derivadas)):
                 matriz[i,j]= np.sum(derivadas[i]*derivadas[j]/weights)
-        delta = (Intensidad([self],datasource.angs) - data_ints)
+        delta = (intkb(self,datasource.angs,kb) - data_ints)
         deltavec=np.ones((len(derivadas),1))
         #print(matriz)
         for i in range(0,len(derivadas)):
             deltavec[i,0]= np.sum(delta * derivadas[i])
-        #print(deltavec)
+        print(deltavec)
         print(matriz)
         if flag:
-            fig,ax=plt.subplots()
-            ax.plot(datasource.angs,delta/datasource.ints)
+            fig,ax=plt.subplots(2,len(derivadas)+1)
+            ax[0,0].plot(datasource.angs,delta)
+            for i in range(0,len(derivadas)):
+                ax[0,i+1].plot(datasource.angs,derivadas[i])
+                ax[1,i+1].plot(datasource.angs,delta*derivadas[i])
             plt.show()
         res =  solve(matriz,deltavec)
         print(res)
         return res
-Ti=estructura(ks1, cel1, 194)
 
 
 
-def iteration(structs, datasource,flag=False):
-    #Unir las estructuras equivalentes (ka con su respectivo kb) para que la derivada afecte a todo el pico y no solo una parte
-     data_ints = datasource.ints-datasource.bgints
-     weights= 1/datasource.ints
+
+# def iteration(structs, datasource,flag=False):
+#     #Unir las estructuras equivalentes (ka con su respectivo kb) para que la derivada afecte a todo el pico y no solo una parte
+#      data_ints = datasource.ints-datasource.bgints
+#      weights= 1/datasource.ints
      
-     derivadasC=[]
-     derivadasU=[]
-     derivadasA=[]
-     for j in structs:
-         for i in np.where(j.refinableks)[0]:
-             derivadasC.append(j.deriv(i,"C",datasource.angs)*weights)
-         for i in np.where(j.refinableUVWg)[0]:
-            derivadasU.append(j.deriv(i,"U",datasource.angs)*weights)
-         for i in np.where(j.refinableCel.flatten())[0]:
-             derivadasA.append(j.deriv(i,"A",datasource.angs)*weights)
-     derivadas = derivadasC+derivadasU+derivadasA
+#      derivadasC=[]
+#      derivadasU=[]
+#      derivadasA=[]
+#      for j in structs:
+#          for i in np.where(j.refinableks)[0]:
+#              derivadasC.append(j.deriv(i,"C",datasource.angs)*weights)
+#          for i in np.where(j.refinableUVWg)[0]:
+#             derivadasU.append(j.deriv(i,"U",datasource.angs)*weights)
+#          for i in np.where(j.refinableCel.flatten())[0]:
+#              derivadasA.append(j.deriv(i,"A",datasource.angs)*weights)
+#      derivadas = derivadasC+derivadasU+derivadasA
 
-     #Se dividen todas las derivadas entre la intensidad. Para restaurar que el peso es 1/I en lugar de
-     #1/I^2, se multiplica por I al armar la matriz
-     matriz = np.ones((len(derivadas),len(derivadas)))
+#      #Se dividen todas las derivadas entre la intensidad. Para restaurar que el peso es 1/I en lugar de
+#      #1/I^2, se multiplica por I al armar la matriz
+#      matriz = np.ones((len(derivadas),len(derivadas)))
      
-     for i in range (0,len(derivadas)):
-         for j in range(0,len(derivadas)):
-             matriz[i,j]= np.sum(derivadas[i]*derivadas[j]/weights)
-     delta = (Intensidad(structs,datasource.angs) - data_ints)
-     deltavec=np.ones((len(derivadas),1))
-     #print(matriz)
-     for i in range(0,len(derivadas)):
-         deltavec[i,0]= np.sum(delta * derivadas[i])
-     #print(deltavec)
-     print(matriz)
-     if flag:
-         fig,ax=plt.subplots()
-         ax.plot(datasource.angs,delta/datasource.ints)
-         plt.show()
-     res =  solve(matriz,deltavec)
-     print(res)
-     return res
+#      for i in range (0,len(derivadas)):
+#          for j in range(0,len(derivadas)):
+#              matriz[i,j]= np.sum(derivadas[i]*derivadas[j]/weights)
+#      delta = (Intensidad(structs,datasource.angs) - data_ints)
+#      deltavec=np.ones((len(derivadas),1))
+#      #print(matriz)
+#      for i in range(0,len(derivadas)):
+#          deltavec[i,0]= np.sum(delta * derivadas[i])
+#      #print(deltavec)
+#      print(matriz)
+#      if flag:
+#          fig,ax=plt.subplots()
+#          ax.plot(datasource.angs,delta/datasource.ints)
+#          plt.show()
+#      res =  solve(matriz,deltavec)
+#      print(res)
+#      return res
+
+
+def intkb(struct,angs,kb,CheckAngs=False,MaxPeaks=99999999,flag=False):
+    if kb is not None:
+        copia = estructura(np.copy(struct.ks),np.copy(struct.celda),struct.gnum,struct.grupo,np.copy(struct.UVWg))
+        copia.la = kb[0]
+        copia.ks[0] = copia.ks[0]/kb[1]
+        if flag:
+            print(copia.patron())
+            print(struct.patron())
+        return Intensidad([struct,copia], angs,CheckAngs=[CheckAngs,True],MaxPeaks=MaxPeaks)
+    else:
+        return Intensidad([struct], angs,CheckAngs,MaxPeaks=MaxPeaks)
+    
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-prov=Wyckoff.semi_readCIF("Ba2SbSmO6.cif")
-prov2=Wyckoff.semi_readCIF("Ba2SbSmO6.cif")
-print (prov[1])
-Ba2SbSmO6= estructura(prov[1],prov[2],prov[0],prov[3])
-Copia= estructura(prov2[1],prov2[2],prov2[0],prov2[3])
-#Ba2SbSmO6.refinableks[0]=False
-Ba2SbSmO6.ks[0]=2.04e-4
-Copia.ks[0]=4.08e-4
-Copia.refinableCel=np.array([[0,0,0,0,0,0],
-                           [0,0,0,0,0,0],
-                           [0,0,0,0,0,0],
-                           [0,0,0,0,0,0]],dtype=bool)
-
-Copia.refinableks = np.array([1,0,0,0,0,0,0])
-
-
-r=[]
-As=[]
-Xs=[]
-k=[]
-k2=[]
-u=[]
-Ba2SbSmO6.refinableCel=np.array([[0,0,0,0,0,0],
-                            [0,0,0,0,0,0],
-                            [0,0,0,0,0,0],
-                            [0,1,0,0,0,0]],dtype=bool)
-Ba2SbSmO6.refinableks = np.array([1,1,0,0,0,0,0])
-suma = np.sum(ASCBa.ints)
-Ba2SbSmO6.ks[[1,2,3]]=8.510
-Copia.ks[[1,2,3]]=8.510
-#Ba2SbSmO6.ks[[1,2,3]]=8.503
-Ba2SbSmO6.celda[3,1]=0.211
-Copia.celda[3,1]=0.211
-
-Ba2SbSmO6.UVWg[2]=0.01
-Copia.UVWg[2]=0.01
-
-#Ba2SbSmO6.celda[3,1]=0.235
-Ba2SbSmO6.refinableUVWg=np.array([0,0,1,0])
-Copia.refinableUVWg=np.array([0,0,0,0])
-Copia.la=la2
-
-
-iteration([Ba2SbSmO6,Copia],ASCBa)
-iteration([Ba2SbSmO6,Copia],ASCBa)
-Ba2SbSmO6.iteration(ASCBa)
-
-NumIters=25
-
-ax.scatter(ASCBa.angs, Intensidad([Ba2SbSmO6,Copia],ASCBa.angs),label="Inicial",s=4,color="black")
-
-
-Ba2SbSmO6.refinableCel=np.array([[0,0,0,0,0,0],
-                           [0,0,0,0,0,0],
-                            [0,0,0,0,0,0],
-                            [0,0,0,0,0,0]],dtype=bool)
-Ba2SbSmO6.refinableks = np.array([1,1,0,0,0,0,0])
-Ba2SbSmO6.refinableUVWg=np.array([0,0,1,0])
-Copia.refinableks[0] = 1
-
-
-for i in range(0,NumIters):
-      print(i)
-      vector = iteration([Ba2SbSmO6,Copia],ASCBa)
-      Ba2SbSmO6.ks[0] -= vector[0,0]
-      Ba2SbSmO6.ks[[1,2,3]] -= vector[1,0]
-      Copia.ks[[1,2,3]] -= vector[1,0]
-      Copia.ks[0] -= vector[2,0]
-      Ba2SbSmO6.UVWg[2] = np.abs(Ba2SbSmO6.UVWg[2] - vector[3,0])
-      Copia.UVWg[2] = np.abs(Ba2SbSmO6.UVWg[2] - vector[3,0])
-#      Ba2SbSmO6.moveatom(19,-vector[4,0])
-#      Copia.moveatom(19,-vector[4,0])
-#      Ba2SbSmO6.FullCell = Wyckoff.custom_Wyckoff(Ba2SbSmO6.grupo, Ba2SbSmO6.celda)
-#      Copia.FullCell = Wyckoff.custom_Wyckoff(Copia.grupo, Copia.celda)
-      
-      r.append(np.sum(((np.abs(ASCBa.ints - ASCBa.bgints - Intensidad([Ba2SbSmO6,Copia],ASCBa.angs)))/suma)))
-      As.append(Ba2SbSmO6.ks[1])
-      Xs.append(Ba2SbSmO6.celda[3,1])
-      k.append(Ba2SbSmO6.ks[0])
-      k2.append(Copia.ks[0])
-      u.append(Ba2SbSmO6.UVWg[2])
-
-
-Ba2SbSmO6.refinableCel=np.array([[0,0,0,0,0,0],
-                           [0,0,0,0,0,0],
-                            [0,0,0,0,0,0],
-                            [0,1,0,0,0,0]],dtype=bool)
-Ba2SbSmO6.refinableks = np.array([0,1,0,0,0,0,0])
-Ba2SbSmO6.refinableUVWg=np.array([0,0,0,0])
-Copia.refinableks[0] = 0
-
-for i in range(0,NumIters):
-      print(i)
-      vector = iteration([Ba2SbSmO6,Copia],ASCBa)
-#      Ba2SbSmO6.ks[0] -= vector[0,0]
-      Ba2SbSmO6.ks[[1,2,3]] -= vector[0,0]
-      Copia.ks[[1,2,3]] -= vector[0,0]
-#      Copia.ks[0] -= vector[2,0]
-#      Ba2SbSmO6.UVWg[2] = np.abs(Ba2SbSmO6.UVWg[2] - vector[1,0])
-#      Copia.UVWg[2] = np.abs(Ba2SbSmO6.UVWg[2] - vector[1,0])
-#      Copia.ks[0] = Ba2SbSmO6.ks[0]*2
-      Ba2SbSmO6.moveatom(19,-vector[1,0])
-      Copia.moveatom(19,-vector[1,0])
-      Ba2SbSmO6.FullCell = Wyckoff.custom_Wyckoff(Ba2SbSmO6.grupo, Ba2SbSmO6.celda)
-      Copia.FullCell = Wyckoff.custom_Wyckoff(Copia.grupo, Copia.celda)
-      
-      r.append(np.sum(((np.abs(ASCBa.ints - ASCBa.bgints - Intensidad([Ba2SbSmO6,Copia],ASCBa.angs)))/suma)))
-      As.append(Ba2SbSmO6.ks[1])
-      Xs.append(Ba2SbSmO6.celda[3,1])
-      k.append(Ba2SbSmO6.ks[0])
-      k2.append(Copia.ks[0])
-      u.append(Ba2SbSmO6.UVWg[2])
-
-
-Ba2SbSmO6.refinableCel=np.array([[0,0,0,0,0,0],
-                           [0,0,0,0,0,0],
-                            [0,0,0,0,0,0],
-                            [0,0,0,0,0,0]],dtype=bool)
-Ba2SbSmO6.refinableks = np.array([1,1,0,0,0,0,0])
-Ba2SbSmO6.refinableUVWg=np.array([0,0,1,0])
-Copia.refinableks[0] = 1
-for i in range(0,NumIters):
-      print(i)
-      vector = iteration([Ba2SbSmO6,Copia],ASCBa)
-      Ba2SbSmO6.ks[0] -= vector[0,0]
-      Ba2SbSmO6.ks[[1,2,3]] -= vector[1,0]
-      Copia.ks[[1,2,3]] -= vector[1,0]
-      Copia.ks[0] -= vector[2,0]
-      Ba2SbSmO6.UVWg[2] = np.abs(Ba2SbSmO6.UVWg[2] - vector[3,0])
-      Copia.UVWg[2] = np.abs(Copia.UVWg[2] - vector[3,0])
-#      Ba2SbSmO6.moveatom(19,-vector[4,0])
-#      Copia.moveatom(19,-vector[4,0])
-#      Ba2SbSmO6.FullCell = Wyckoff.custom_Wyckoff(Ba2SbSmO6.grupo, Ba2SbSmO6.celda)
-#      Copia.FullCell = Wyckoff.custom_Wyckoff(Copia.grupo, Copia.celda)
-      
-      r.append(np.sum(((np.abs(ASCBa.ints - ASCBa.bgints - Intensidad([Ba2SbSmO6,Copia],ASCBa.angs)))/suma)))
-      As.append(Ba2SbSmO6.ks[1])
-      Xs.append(Ba2SbSmO6.celda[3,1])
-      k.append(Ba2SbSmO6.ks[0])
-      k2.append(Copia.ks[0])
-      u.append(Ba2SbSmO6.UVWg[2])
-      
-      
-Ba2SbSmO6.refinableCel=np.array([[0,0,0,0,0,0],
-                           [0,0,0,0,0,0],
-                            [0,0,0,0,0,0],
-                            [0,1,0,0,0,0]],dtype=bool)
-Ba2SbSmO6.refinableks = np.array([1,1,0,0,0,0,0])
-Ba2SbSmO6.refinableUVWg=np.array([0,0,0,0])
-Copia.refinableks[0] = 0
-
-for i in range(0,NumIters):
-      print(i)
-      vector = iteration([Ba2SbSmO6,Copia],ASCBa)
-      Ba2SbSmO6.ks[0] -= vector[0,0]
-      Ba2SbSmO6.ks[[1,2,3]] -= vector[1,0]
-      Copia.ks[[1,2,3]] -= vector[1,0]
-#      Copia.ks[0] -= vector[2,0]
-#      Ba2SbSmO6.UVWg[2] = np.abs(Ba2SbSmO6.UVWg[2] - vector[1,0])
-#      Copia.UVWg[2] = np.abs(Ba2SbSmO6.UVWg[2] - vector[1,0])
-#      Copia.ks[0] = Ba2SbSmO6.ks[0]*2
-      Ba2SbSmO6.moveatom(19,-vector[2,0])
-      Copia.moveatom(19,-vector[2,0])
-      Ba2SbSmO6.FullCell = Wyckoff.custom_Wyckoff(Ba2SbSmO6.grupo, Ba2SbSmO6.celda)
-      Copia.FullCell = Wyckoff.custom_Wyckoff(Copia.grupo, Copia.celda)
-      
-      r.append(np.sum(((np.abs(ASCBa.ints - ASCBa.bgints - Intensidad([Ba2SbSmO6,Copia],ASCBa.angs)))/suma)))
-      As.append(Ba2SbSmO6.ks[1])
-      Xs.append(Ba2SbSmO6.celda[3,1])
-      k.append(Ba2SbSmO6.ks[0])
-      k2.append(Copia.ks[0])
-      u.append(Ba2SbSmO6.UVWg[2])
-      
-      
-
-ax.scatter(ASCBa.angs, Intensidad([Ba2SbSmO6,Copia],ASCBa.angs),label="Final",s=4,color="red")
-ax.legend()
-print(Ba2SbSmO6.ks)
-print(Ba2SbSmO6.celda)
-plt.legend()
-# plt.title(r'$w_i = I^{-1}$')
-fig,ax=plt.subplots()
-# plt.title(r'$w_i = I^{-1}$')
-ax.plot(np.arange(len(r)),np.array(r))
-plt.xlabel("Iteraciones")
-plt.ylabel("R")
-
-fig,ax=plt.subplots()
-ax.plot(np.arange(len(As)),np.array(As))
-#plt.title(r'$w_i = I^{-1}$')
-plt.xlabel("Iteraciones")
-plt.ylabel("a (A)")
-ax.plot(np.array([0,3*NumIters]),np.array([8.503,8.503]))
-
-fig,ax=plt.subplots()
-ax.plot(np.arange(len(Xs)),np.array(Xs))
-#plt.title(r'$w_i = I^{-1}$')
-plt.xlabel("Iteraciones")
-plt.ylabel("x (rel. units)")
-ax.plot(np.array([0,3*NumIters]),np.array([0.235,0.235]))
-
-fig,ax=plt.subplots()
-ax.plot(np.arange(len(k)),np.array(k))
-ax.plot(np.arange(len(k2)),np.array(k2))
-#plt.title(r'$w_i = I^{-1}$')
-plt.xlabel("Iteraciones")
-plt.ylabel("k")
-
-fig,ax=plt.subplots()
-ax.plot(np.arange(len(u)),np.array(u))
-#plt.title(r'$w_i = I^{-1}$')
-plt.xlabel("Iteraciones")
-plt.ylabel("u")
-
-
-fig, ax=plt.subplots()
-ax.plot(ASCBa.angs, ASCBa.ints - ASCBa.bgints - Intensidad([Ba2SbSmO6,Copia], ASCBa.angs))   
         
 
 

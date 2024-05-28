@@ -14,33 +14,21 @@ from tkinter import filedialog
 import tablas
 import time
 import refinamiento2 as ref
+import PIL
 
+#Valores iniciales de todos los parámetros
 k=1
-a=2.9500
-b=2.9500
-c=4.6800
+a=0
+b=0
+c=0
 al=90*np.pi/180
 be=90*np.pi/180
 ga=120*np.pi/180
 la=1.54060
 delta=0.0001
-cel1=np.array([
-    [22,0,0,0,0],
-    [22,1/3,2/3,0.50,0]
-    ])
+
+
 ks1=[k,a,b,c,al,be,ga]
-
-
-ks2=[100,4.593,4.593,2.9590,90*np.pi/180,90*np.pi/180,90*np.pi/180]
-
-n=1
-cel=np.array([
-      [22,0,0,0,0,1],
-      [8,0.306,0.306,0,0,n],
-      ])
-cel2=Wyckoff.Wyckoff(136, cel)
-ks3=[100,3.7850 ,3.7850 ,9.520,90*np.pi/180,90*np.pi/180,90*np.pi/180]
-cel3=Wyckoff.Wyckoff(141, np.array([[22,0,0-1/4,0-3/8,0,1],[8,0,0-1/4,0.20806-3/8,0,1]]))
 
 
 root = tk.Tk()
@@ -64,6 +52,7 @@ zlabel=tk.Label(root,text="z")
 ulabel=tk.Label(root,text="U")
 
 cellabel2=tk.Label(root,text="")
+cellabel3=tk.Label(root,text="")
 
 title.grid(row=0,column=3)
 
@@ -84,6 +73,7 @@ ylabel.grid(row=6,column=2)
 zlabel.grid(row=6,column=3)
 ulabel.grid(row=6,column=4)
 cellabel2.grid(row=5,column=5)
+cellabel3.grid(row=5,column=6)
 
 #Textboxes
 groupentry=tk.Entry(root)
@@ -208,7 +198,8 @@ def celadd():
         except:
             print("Entrada inválida")
     cel1=Wyckoff.Wyckoff(g,cel)
-    cellabel2.config(text=cel1)
+    cellabel2.config(text=cel)
+    cellabel3.config(text=len(Wyckoff.Wyckoff(g, cel)))
 addbutton=tk.Button(root,text="Añadir",command=celadd)
 def celrm():
     global cel
@@ -219,14 +210,16 @@ def celrm():
     except:
         print("Nada que remover")
     cel1=Wyckoff.Wyckoff(g,cel)
-    cellabel2.config(text=cel1)
+    cellabel2.config(text=cel)
+    cellabel3.config(text=len(Wyckoff.Wyckoff(g, cel)))
 rmbutton=tk.Button(root,text="Quitar último",command=celrm)
 def rmr():
     global cel
     global cel1
     cel=[]
     cel1=[]
-    cellabel2.config(text=cel1)
+    cellabel2.config(text=cel)
+    cellabel3.config(text=np.shape(Wyckoff.Wyckoff(g, cel[:])))
 rmrbutton=tk.Button(root,text="Limpiar celda",command=rmr)
 
 def calc():
@@ -268,9 +261,9 @@ def calc():
         ks[3]=eval(aentry.get())
     for i in range(0,len(ks)):
         ks[i]=float(ks[i])
-    prov=ref.MinInfoPat(ks,cel2)
-    print(prov)
-    patron=ref.Intensidad(prov, 1, np.linspace(ref.minang-1,ref.maxang+1,1000))
+    prov=ref.estructura(ks,cel2,g)
+    print(prov.patron())
+    patron=ref.Intensidad([prov], np.linspace(ref.minang-1,ref.maxang+1,1000))
     patron=patron*100/np.max(patron)
     fig,ax=plt.subplots()
     ax.plot(np.linspace(ref.minang-1,ref.maxang+1,1000),patron)
@@ -290,13 +283,14 @@ def Opencif():
     cel=provisional[2]
     grupo=provisional[3]
     cel1=Wyckoff.custom_Wyckoff(grupo, cel)
-    cellabel2.config(text=cel1)
-    prov=ref.MinInfoPat(ks,cel1)
-    print(prov)
-    patron=ref.Intensidad(prov, 1, np.linspace(ref.minang-1,ref.maxang+1,1000))
+    prov = ref.estructura(provisional[1],provisional[2],provisional[0],provisional[3])
+    print(prov.patron())
+    patron=ref.Intensidad([prov], np.linspace(ref.minang-1,ref.maxang+1,1000))
     patron=patron*100/np.max(patron)
     fig,ax=plt.subplots()
     ax.plot(np.linspace(ref.minang-1,ref.maxang+1,1000),patron)
+    cellabel2.config(text=cel)
+    cellabel3.config(text=len(Wyckoff.Wyckoff(g, cel)))
     plt.show()
     
 cifbutton = tk.Button(root, text="Leer desde archivo cif", command=Opencif)
